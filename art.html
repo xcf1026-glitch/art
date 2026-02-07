@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>互動式霓虹流體 - p5.js</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    /* CSS 設定：確保畫布全螢幕且無捲軸 */
+    body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden; /* 防止出現捲軸 */
+      background-color: #000; /* 預設背景黑 */
+    }
+    canvas {
+      display: block; /* 移除 canvas 底部預設的微小間隙 */
+    }
+  </style>
+</head>
+<body>
+
+<script>
+  // --- p5.js 程式碼開始 ---
+
+  let particles = [];
+  // 根據螢幕大小動態決定粒子數量，讓手機版比較不卡頓
+  let numParticles; 
+  const noiseScale = 0.01;
+
+  function setup() {
+    createCanvas(windowWidth, windowHeight);
+    
+    // 根據螢幕寬度決定粒子數量 (大螢幕 300，小螢幕 150)
+    numParticles = windowWidth > 800 ? 300 : 150;
+
+    colorMode(HSB, 360, 100, 100, 100);
+    noStroke();
+    
+    // 初始化粒子
+    initParticles();
+  }
+
+  function initParticles() {
+    particles = [];
+    for (let i = 0; i < numParticles; i++) {
+      particles.push(new Particle());
+    }
+  }
+
+  function draw() {
+    // 殘影效果：覆蓋半透明背景
+    background(0, 0, 0, 10); 
+
+    for (let p of particles) {
+      p.edges();
+      p.update();
+      p.show();
+    }
+  }
+
+  // --- 響應式關鍵：當視窗大小改變時 ---
+  function windowResized() {
+    resizeCanvas(windowWidth, windowHeight);
+    // 重新計算粒子數量（可選，若不希望重置粒子可移除 initParticles）
+    numParticles = windowWidth > 800 ? 300 : 150;
+    // 稍微加深背景，避免調整視窗時殘影太亂
+    background(0);
+  }
+
+  // --- 粒子類別 ---
+  class Particle {
+    constructor() {
+      this.pos = createVector(random(width), random(height));
+      this.vel = createVector(0, 0);
+      this.acc = createVector(0, 0);
+      this.maxSpeed = 4;
+      this.colorHue = random(360);
+    }
+
+    update() {
+      // 1. 滑鼠互動 (吸引力)
+      let mouse = createVector(mouseX, mouseY);
+      let dir = p5.Vector.sub(mouse, this.pos);
+      let distance = dir.mag();
+      
+      // 設定感應半徑
+      if (distance < 300) {
+        dir.normalize();
+        dir.mult(0.5); 
+        this.acc.add(dir);
+      }
+
+      // 2. 流體雜訊 (Perlin Noise)
+      let n = noise(this.pos.x * noiseScale, this.pos.y * noiseScale, frameCount * 0.005);
+      let angle = n * TWO_PI * 2;
+      let wind = p5.Vector.fromAngle(angle);
+      wind.mult(0.2);
+      this.acc.add(wind);
+
+      // 物理更新
+      this.vel.add(this.acc);
+      this.vel.limit(this.maxSpeed);
+      this.pos.add(this.vel);
+      this.acc.mult(0); 
+
+      // 顏色變換邏輯
+      if (distance < 200) {
+        this.colorHue = (this.colorHue + 5) % 360; 
+      } else {
+        this.colorHue = (this.colorHue + 0.5) % 360;
+      }
+    }
+
+    // 邊界穿梭
+    edges() {
+      if (this.pos.x > width) this.pos.x = 0;
+      if (this.pos.x < 0) this.pos.x = width;
+      if (this.pos.y > height) this.pos.y = 0;
+      if (this.pos.y < 0) this.pos.y = height;
+    }
+
+    show() {
+      blendMode(ADD); 
+      let r = map(this.vel.mag(), 0, this.maxSpeed, 2, 6);
+      fill(this.colorHue, 80, 100, 50);
+      ellipse(this.pos.x, this.pos.y, r);
+      blendMode(BLEND);
+    }
+  }
+</script>
+
+</body>
+</html>
